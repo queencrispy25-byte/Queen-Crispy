@@ -42,7 +42,67 @@ function clearCart(){cart={};render()}
 function createOrder(){if(!Object.keys(cart).some(k=>cart[k]>0)){alert('الطلب فارغ');return null}let now=new Date(),id=orderNumber();let o={id,day:dayKey(now),time:now.toLocaleString('fr-MA'),items:Object.keys(cart).filter(k=>cart[k]>0&&products[k]).map(k=>({name:products[k][0],qty:cart[k],price:Number(products[k][1])})),total:total()};orders.push(o);if(!persist()){orders.pop();return null}storage.set('qc_next_order',id+1);clearCart();return o}
 function receipt(o){$('receipt').style.setProperty('--paper',settings.paperSize==='58'?'50mm':'72mm');$('receipt').innerHTML=`${settings.logo?`<p><img src="${settings.logo}" alt="شعار"></p>`:''}<h2>${escapeHtml(settings.shopName)}</h2><p>${escapeHtml(settings.shopAddress)}</p>${settings.shopPhone?`<p>${escapeHtml(settings.shopPhone)}</p>`:''}<div>طلب رقم: ${escapeHtml(o.id)}</div><div>${escapeHtml(o.time)}</div><hr>${o.items.map(x=>`<div class="line"><span>${escapeHtml(x.name)} × ${Number(x.qty)}</span><span>${(Number(x.qty)*Number(x.price)).toFixed(2)} DH</span></div>`).join('')}<hr><div class="line total">المجموع: ${Number(o.total).toFixed(2)} DH</div><p>${escapeHtml(settings.thankYou)}</p>`}
 let currentReceiptBlob=null,currentReceiptName='queen-crispy-ticket.png';
-function canvasText(ctx,text,x,y,maxWidth,font,align='right'){ctx.font=font;ctx.textAlign=align;ctx.direction='rtl';let words=String(text??'').split(/\s+/),line='',lines=[];for(const word of words){let test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word}else line=test}if(line)lines.push(line);for(const part of lines){ctx.fillText(part,x,y);y+=Math.ceil(parseInt(font,10)*1.45)}return y}
+function canvasText(ctx,text,x,y,maxWidth,font,align='right'){
+ctx.font=font;
+ctx.textAlign=align;
+ctx.direction='rtl';
+ctx.fillStyle='#111';
+
+const size=Number((font.match(/(\d+(?:\.\d+)?)px/)||[])[1])||22;
+const lineHeight=Math.ceil(size*1.45);
+
+let words=String(text??'').split(/\s+/);
+let line='',lines=[];
+
+for(const word of words){
+let test=line?line+' '+word:word;
+if(ctx.measureText(test).width>maxWidth&&line){
+lines.push(line);
+line=word;
+}else{
+line=test;
+}
+}
+
+if(line)lines.push(line);
+
+for(const part of lines){
+ctx.fillText(part,x,y);
+y+=lineHeight;
+}
+
+return y;
+}
+ctx.font=font;
+ctx.textAlign=align;
+ctx.direction='rtl';
+ctx.fillStyle='#111';
+
+const size=Number((font.match(/(\d+(?:\.\d+)?)px/)||[])[1])||22;
+const lineHeight=Math.ceil(size*1.45);
+
+let words=String(text??'').split(/\s+/);
+let line='',lines=[];
+
+for(const word of words){
+let test=line?line+' '+word:word;
+if(ctx.measureText(test).width>maxWidth&&line){
+lines.push(line);
+line=word;
+}else{
+line=test;
+}
+}
+
+if(line)lines.push(line);
+
+for(const part of lines){
+ctx.fillText(part,x,y);
+y+=lineHeight;
+}
+
+return y;
+  }s+/),line='',lines=[];for(const word of words){let test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word}else line=test}if(line)lines.push(line);for(const part of lines){ctx.fillText(part,x,y);y+=Math.ceil(parseInt(font,10)*1.45)}return y}
 async function makeReceiptImage(o){const width=settings.paperSize==='58'?384:576,pad=22,inner=width-pad*2,scale=2;let canvas=document.createElement('canvas'),ctx;let rows=[];const add=(text,font='24px Tahoma',height=36,align='right')=>rows.push({text,font,height,align});
 if(settings.logo){try{let im=new Image();im.src=settings.logo;await new Promise((res,rej)=>{im.onload=res;im.onerror=rej});rows.push({image:im,height:90})}catch(e){}}
 add(settings.shopName||'Queen Crispy','bold 30px Tahoma',46,'center');if(settings.shopAddress)add(settings.shopAddress,'22px Tahoma',34,'center');if(settings.shopPhone)add(settings.shopPhone,'21px Tahoma',32,'center');add('طلب رقم: '+o.id,'22px Tahoma',34);add(o.time,'19px Tahoma',30);rows.push({rule:true,height:18});
