@@ -42,75 +42,15 @@ function clearCart(){cart={};render()}
 function createOrder(){if(!Object.keys(cart).some(k=>cart[k]>0)){alert('الطلب فارغ');return null}let now=new Date(),id=orderNumber();let o={id,day:dayKey(now),time:now.toLocaleString('fr-MA'),items:Object.keys(cart).filter(k=>cart[k]>0&&products[k]).map(k=>({name:products[k][0],qty:cart[k],price:Number(products[k][1])})),total:total()};orders.push(o);if(!persist()){orders.pop();return null}storage.set('qc_next_order',id+1);clearCart();return o}
 function receipt(o){$('receipt').style.setProperty('--paper',settings.paperSize==='58'?'50mm':'72mm');$('receipt').innerHTML=`${settings.logo?`<p><img src="${settings.logo}" alt="شعار"></p>`:''}<h2>${escapeHtml(settings.shopName)}</h2><p>${escapeHtml(settings.shopAddress)}</p>${settings.shopPhone?`<p>${escapeHtml(settings.shopPhone)}</p>`:''}<div>طلب رقم: ${escapeHtml(o.id)}</div><div>${escapeHtml(o.time)}</div><hr>${o.items.map(x=>`<div class="line"><span>${escapeHtml(x.name)} × ${Number(x.qty)}</span><span>${(Number(x.qty)*Number(x.price)).toFixed(2)} DH</span></div>`).join('')}<hr><div class="line total">المجموع: ${Number(o.total).toFixed(2)} DH</div><p>${escapeHtml(settings.thankYou)}</p>`}
 let currentReceiptBlob=null,currentReceiptName='queen-crispy-ticket.png';
-function canvasText(ctx,text,x,y,maxWidth,font,align='right'){
-ctx.font=font;
-ctx.textAlign=align;
-ctx.direction='rtl';
-ctx.fillStyle='#111';
-
-const size=Number((font.match(/(\d+(?:\.\d+)?)px/)||[])[1])||22;
-const lineHeight=Math.ceil(size*1.45);
-
-let words=String(text??'').split(/\s+/);
-let line='',lines=[];
-
-for(const word of words){
-let test=line?line+' '+word:word;
-if(ctx.measureText(test).width>maxWidth&&line){
-lines.push(line);
-line=word;
-}else{
-line=test;
-}
-}
-
-if(line)lines.push(line);
-
-for(const part of lines){
-ctx.fillText(part,x,y);
-y+=lineHeight;
-}
-
-return y;
-}
-ctx.font=font;
-ctx.textAlign=align;
-ctx.direction='rtl';
-ctx.fillStyle='#111';
-
-const size=Number((font.match(/(\d+(?:\.\d+)?)px/)||[])[1])||22;
-const lineHeight=Math.ceil(size*1.45);
-
-let words=String(text??'').split(/\s+/);
-let line='',lines=[];
-
-for(const word of words){
-let test=line?line+' '+word:word;
-if(ctx.measureText(test).width>maxWidth&&line){
-lines.push(line);
-line=word;
-}else{
-line=test;
-}
-}
-
-if(line)lines.push(line);
-
-for(const part of lines){
-ctx.fillText(part,x,y);
-y+=lineHeight;
-}
-
-return y;
-  }s+/),line='',lines=[];for(const word of words){let test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word}else line=test}if(line)lines.push(line);for(const part of lines){ctx.fillText(part,x,y);y+=Math.ceil(parseInt(font,10)*1.45)}return y}
-async function makeReceiptImage(o){const width=settings.paperSize==='58'?384:576,pad=22,inner=width-pad*2,scale=2;let canvas=document.createElement('canvas'),ctx;let rows=[];const add=(text,font='24px Tahoma',height=36,align='right')=>rows.push({text,font,height,align});
+function canvasText(ctx,text,x,y,maxWidth,font,align='right'){ctx.font=font;ctx.textAlign=align;ctx.direction='rtl';let words=String(text??'').split(/\s+/),line='',lines=[];for(const word of words){let test=line?line+' '+word:word;if(ctx.measureText(test).width>maxWidth&&line){lines.push(line);line=word}else line=test}if(line)lines.push(line);for(const part of lines){ctx.fillText(part,x,y);y+=Math.ceil(parseInt(font,10)*1.45)}return y}
+async function makeReceiptImage(o){const width=settings.paperSize==='58'?384:576,pad=22,inner=width-pad*2,scale=2;let canvas=document.createElement('canvas'),ctx=canvas.getContext('2d');let rows=[];const add=(text,font='24px Tahoma',height=36,align='right')=>rows.push({text,font,height,align});
 if(settings.logo){try{let im=new Image();im.src=settings.logo;await new Promise((res,rej)=>{im.onload=res;im.onerror=rej});rows.push({image:im,height:90})}catch(e){}}
 add(settings.shopName||'Queen Crispy','bold 30px Tahoma',46,'center');if(settings.shopAddress)add(settings.shopAddress,'22px Tahoma',34,'center');if(settings.shopPhone)add(settings.shopPhone,'21px Tahoma',32,'center');add('طلب رقم: '+o.id,'22px Tahoma',34);add(o.time,'19px Tahoma',30);rows.push({rule:true,height:18});
 for(const item of o.items||[]){let name=`${item.name} × ${item.qty}`;rows.push({itemName:name,amount:(Number(item.qty)*Number(item.price)).toFixed(2)+' DH',height:56})}
 rows.push({rule:true,height:18});add('المجموع: '+Number(o.total).toFixed(2)+' DH','bold 27px Tahoma',48);add(settings.thankYou||'شكراً على زيارتكم!','bold 23px Tahoma',48,'center');
-let height=pad*2+rows.reduce((n,r)=>n+(r.height||0),0)+24;canvas.width=width*scale;canvas.height=height*scale;ctx=canvas.getContext('2d',{alpha:false});if(!ctx)throw new Error('Canvas غير مدعوم');ctx.setTransform(scale,0,0,scale,0,0);ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);ctx.fillStyle='#111';ctx.textBaseline='alphabetic';let y=pad;for(const r of rows){if(r.image){let w=Math.min(80,r.image.width),h=Math.min(80,r.image.height);ctx.drawImage(r.image,(width-w)/2,y,w,h);y+=r.height;continue}if(r.rule){ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(pad,y+5);ctx.lineTo(width-pad,y+5);ctx.strokeStyle='#555';ctx.stroke();ctx.setLineDash([]);y+=r.height;continue}if(r.itemName){ctx.font='21px Tahoma';ctx.direction='rtl';ctx.textAlign='right';ctx.fillText(r.itemName,width-pad,y+23,inner*.68);ctx.font='bold 20px Tahoma';ctx.direction='ltr';ctx.textAlign='left';ctx.fillText(r.amount,pad,y+23,inner*.30);y+=r.height;continue}y=canvasText(ctx,r.text,r.align==='center'?width/2:width-pad,y+parseInt(r.font,10),inner,r.font,r.align)+Math.max(0,r.height-parseInt(r.font,10)*1.45)}
-let blob=await new Promise((resolve,reject)=>{if(!canvas.toBlob)return reject(new Error('PNG غير مدعوم'));canvas.toBlob(b=>b?resolve(b):reject(new Error('تعذر تحويل الفاتورة إلى PNG')),'image/png')});if(!blob||blob.size<500)throw new Error('الصورة الناتجة فارغة');return blob}
-let currentPreviewUrl=null;async function prepareReceiptImage(o){$('receiptTools').style.display='block';$('receiptStatus').textContent='كنوجد صورة الفاتورة...';currentReceiptBlob=null;currentReceiptName=`queen-crispy-${o.id}.png`;try{currentReceiptBlob=await makeReceiptImage(o);if(!currentReceiptBlob||currentReceiptBlob.size<500)throw new Error('الصورة فارغة');if(currentPreviewUrl)URL.revokeObjectURL(currentPreviewUrl);currentPreviewUrl=URL.createObjectURL(currentReceiptBlob);let preview=$('receiptPreview');preview.onload=()=>{$('receiptStatus').textContent='الصورة واجدة وواضحة. تقدر تشاركها مع iPrint أو تحملها.'};preview.onerror=()=>{$('receiptStatus').textContent='تعذر عرض المعاينة؛ جرّب تحميل الصورة وفتحها في iPrint.'};preview.src=currentPreviewUrl}catch(e){currentReceiptBlob=null;$('receiptStatus').textContent='تعذر إنشاء صورة الفاتورة: '+(e.message||'خطأ غير معروف')+'. استعمل الطباعة العادية.';console.error('Receipt image error:',e)}}
+let height=pad*2+rows.reduce((n,r)=>n+(r.height||0),0)+12;canvas.width=width*scale;canvas.height=height*scale;ctx.scale(scale,scale);ctx.fillStyle='#fff';ctx.fillRect(0,0,width,height);ctx.fillStyle='#000';let y=pad;for(const r of rows){if(r.image){let w=Math.min(80,r.image.width),h=Math.min(80,r.image.height);ctx.drawImage(r.image,(width-w)/2,y,w,h);y+=r.height;continue}if(r.rule){ctx.setLineDash([5,4]);ctx.beginPath();ctx.moveTo(pad,y+5);ctx.lineTo(width-pad,y+5);ctx.strokeStyle='#555';ctx.stroke();ctx.setLineDash([]);y+=r.height;continue}if(r.itemName){ctx.font='21px Tahoma';ctx.direction='rtl';ctx.textAlign='right';ctx.fillText(r.itemName,width-pad,y+23,inner*.68);ctx.font='bold 20px Tahoma';ctx.direction='ltr';ctx.textAlign='left';ctx.fillText(r.amount,pad,y+23,inner*.30);y+=r.height;continue}y=canvasText(ctx,r.text,r.align==='center'?width/2:width-pad,y+parseInt(r.font,10),inner,r.font,r.align)+Math.max(0,r.height-parseInt(r.font,10)*1.45)}
+return await new Promise(resolve=>canvas.toBlob(resolve,'image/png'))}
+async function prepareReceiptImage(o){$('receiptTools').style.display='block';$('receiptStatus').textContent='كنوجد صورة الفاتورة...';currentReceiptName=`queen-crispy-${o.id}.png`;try{currentReceiptBlob=await makeReceiptImage(o);if(!currentReceiptBlob)throw new Error('PNG failed');$('receiptPreview').src=URL.createObjectURL(currentReceiptBlob);$('receiptStatus').textContent='الصورة واجدة. تقدر تحملها وتفتحها في iPrint.'}catch(e){currentReceiptBlob=null;$('receiptStatus').textContent='تعذر إنشاء الصورة في هذا المتصفح. استعمل الطباعة العادية.'}}
 function downloadReceiptImage(){if(!currentReceiptBlob)return alert('صورة الفاتورة مازال كتوجد أو تعذر إنشاؤها');let url=URL.createObjectURL(currentReceiptBlob),a=document.createElement('a');a.href=url;a.download=currentReceiptName;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);$('receiptStatus').textContent='تم تحميل الصورة. افتح iPrint واختارها من الصور أو الملفات.'}
 async function shareReceiptToIPrint(){if(!currentReceiptBlob)return downloadReceiptImage();let file=new File([currentReceiptBlob],currentReceiptName,{type:'image/png'});try{if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Queen Crispy - Ticket'});$('receiptStatus').textContent='اختار iPrint من قائمة المشاركة إذا كان ظاهر.';return}}catch(e){if(e&&e.name==='AbortError')return}downloadReceiptImage()}
 function finish(){let o=createOrder();if(o){receipt(o);prepareReceiptImage(o);$('receiptTools').scrollIntoView({behavior:'smooth',block:'start'})}}function saveOnly(){let o=createOrder();if(o)alert('تم حفظ الطلب رقم '+o.id)}
