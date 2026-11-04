@@ -38,18 +38,9 @@ label{display:block;margin:12px 0 5px}input[type=color]{width:80px;height:42px;p
 @media(min-width:700px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media print{
   @page{size:74mm 105mm;margin:0}
-  html,body{
-    background:#fff!important;color:#000!important;
-    margin:0!important;padding:0!important;
-    width:74mm!important;min-width:74mm!important;max-width:74mm!important;
-  }
+  html,body{background:#fff!important;color:#000!important;margin:0!important;padding:0!important;width:74mm!important;min-width:74mm!important;max-width:74mm!important}
   body>*:not(#receipt){display:none!important}
-  #receipt{
-    display:block!important;visibility:visible!important;position:static!important;
-    width:74mm!important;max-width:74mm!important;margin:0!important;padding:2mm!important;
-    box-sizing:border-box!important;background:#fff!important;color:#000!important;
-    font:12px Tahoma,Arial,sans-serif!important;direction:rtl!important;overflow:visible!important;
-  }
+  #receipt{display:block!important;visibility:visible!important;position:static!important;width:74mm!important;max-width:74mm!important;margin:0!important;padding:2mm!important;box-sizing:border-box!important;background:#fff!important;color:#000!important;font:12px Tahoma,Arial,sans-serif!important;direction:rtl!important;overflow:visible!important}
   #receipt h2{text-align:center;font-size:17px}
   #receipt .line{border-bottom:1px dashed #777}
   #receipt .total{color:#000!important}
@@ -73,7 +64,7 @@ label{display:block;margin:12px 0 5px}input[type=color]{width:80px;height:42px;p
    <button class="primary" onclick="finish()">تأكيد الطلب وطباعة التيكي</button>
    <button onclick="saveOnly()">حفظ بلا طباعة</button><button class="danger" onclick="clearCart()">مسح السلة</button>
   </div>
-  <small>الفاتورة كتطبع مباشرة، ويمكن اختيار Save as PDF من نافذة الطباعة.</small>
+  <small>الفاتورة كتوجد، ويمكن فتحها ومشاركتها كملف PDF.</small>
  </section>
  <section id="history"><h2>📊 مبيعات اليوم</h2><div id="stats"></div><button onclick="showHistory()">عرض آخر الطلبات</button><div id="orders"></div></section>
 </main>
@@ -100,8 +91,8 @@ label{display:block;margin:12px 0 5px}input[type=color]{width:80px;height:42px;p
   <div class="actions"><button class="primary" onclick="saveShop()">حفظ معلومات التيكي</button><button onclick="testPrint()">تجربة الفاتورة</button></div>
  </section>
  <section class="setting-section">
-  <h3>🖨️ إعدادات الطابعة</h3>
-  <p class="muted">مقاس التيكي مضبوط على ISO A7 (74 × 105 mm). الطباعة كتستعمل نافذة الطباعة ديال Android/Chrome.</p>
+  <h3>🖨️ إعدادات الطابعة و PDF</h3>
+  <p class="muted">مشاركة PDF كتجهز ملفاً بمقاس ISO A7 (74 × 105 mm). الطباعة العادية كتفتح نافذة الطباعة ديال الهاتف.</p>
   <button class="primary" onclick="testPrint()">تجربة الطباعة A7</button>
  </section>
  <section class="setting-section">
@@ -133,13 +124,16 @@ label{display:block;margin:12px 0 5px}input[type=color]{width:80px;height:42px;p
 <section id="receipt"></section>
 <section id="receiptTools">
  <h3>🧾 فاتورة Queen Crispy</h3>
- <p class="muted">اضغط على طباعة عادية. ومن نافذة الطباعة ديال Android تقدر تختار Save as PDF لحفظ الفاتورة أو مشاركتها.</p>
+ <p class="muted">اختار الطباعة العادية أو مشاركة الفاتورة كملف PDF بمقاس A7.</p>
  <div class="actions">
-  <button class="primary" onclick="printReceipt()">🖨️ طباعة / مشاركة PDF</button>
+  <button class="primary" onclick="printReceipt()">🖨️ طباعة عادية</button>
+  <button onclick="shareReceiptPDF()">📤 مشاركة PDF</button>
  </div>
  <small id="receiptStatus" class="muted"></small>
 </section>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const defaultProducts=[
  ['سندويش نورمال',10,'سندويشات'],['سندويش دجاج',15,'سندويشات'],['سندويش كفتة',17,'سندويشات'],
@@ -191,16 +185,98 @@ function createOrder(){
 function receipt(o){
  $('receipt').innerHTML=`${settings.logo?`<p><img src="${settings.logo}" alt="شعار"></p>`:''}<h2>${escapeHtml(settings.shopName)}</h2><p>${escapeHtml(settings.shopAddress)}</p>${settings.shopPhone?`<p>${escapeHtml(settings.shopPhone)}</p>`:''}<div>طلب رقم: ${escapeHtml(o.id)}</div><div>${escapeHtml(o.time)}</div><hr>${o.items.map(x=>`<div class="line"><span>${escapeHtml(x.name)} × ${Number(x.qty)}</span><span>${(Number(x.qty)*Number(x.price)).toFixed(2)} DH</span></div>`).join('')}<hr><div class="line total">المجموع: ${Number(o.total).toFixed(2)} DH</div><p>${escapeHtml(settings.thankYou)}</p>`;
 }
+
+/* إنشاء PDF حقيقي A7 مباشرة وفتحه في الهاتف */
+let lastReceiptPdfBlob=null;
+let lastReceiptPdfName='Queen-Crispy-receipt.pdf';
+
+async function buildReceiptPDF(){
+ const receiptEl=$('receipt');
+ if(!receiptEl.innerHTML.trim())throw new Error('ما كايناش فاتورة للطباعة');
+ if(!window.html2canvas||!window.jspdf)throw new Error('مكتبات PDF غير متوفرة. اتصل بالإنترنت وحاول مجدداً.');
+
+ const oldStyle=receiptEl.getAttribute('style');
+ try{
+  receiptEl.style.cssText=[
+   'display:block','position:fixed','left:-10000px','top:0',
+   'width:70mm','padding:2mm','margin:0','background:#fff',
+   'color:#000','direction:rtl','visibility:visible',
+   'font:12px Tahoma,Arial,sans-serif','box-sizing:border-box'
+  ].join(';');
+
+  const imgs=[...receiptEl.querySelectorAll('img')];
+  await Promise.all(imgs.map(img=>{
+   if(img.complete)return Promise.resolve();
+   return new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;});
+  }));
+
+  const canvas=await html2canvas(receiptEl,{
+   scale:3,backgroundColor:'#ffffff',useCORS:true,logging:false
+  });
+
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF({
+   orientation:'portrait',unit:'mm',format:[74,105],compress:true
+  });
+
+  const imgData=canvas.toDataURL('image/jpeg',0.95);
+  const drawWidth=70;
+  const drawHeight=canvas.height*drawWidth/canvas.width;
+  const maxHeight=101;
+
+  /* إذا كانت الفاتورة طويلة، تصغّر بشكل متناسب لتبقى داخل صفحة A7 */
+  const ratio=Math.min(1,maxHeight/drawHeight);
+  pdf.addImage(imgData,'JPEG',2,2,drawWidth*ratio,drawHeight*ratio,undefined,'FAST');
+
+  lastReceiptPdfBlob=pdf.output('blob');
+  lastReceiptPdfName='Queen-Crispy-'+Date.now()+'.pdf';
+  return lastReceiptPdfBlob;
+ }finally{
+  if(oldStyle===null)receiptEl.removeAttribute('style');
+  else receiptEl.setAttribute('style',oldStyle);
+ }
+}
+
 function printReceipt(){
- if(!$('receipt').innerHTML.trim()){alert('ما كايناش فاتورة للطباعة');return}
+ if(!$('receipt').innerHTML.trim()){
+  alert('ما كايناش فاتورة للطباعة');
+  return;
+ }
+ $('receiptStatus').textContent='تم فتح نافذة الطباعة. اختار الطابعة أو حفظ PDF من إعدادات الهاتف.';
  window.print();
 }
+
+async function shareReceiptPDF(){
+ const status=$('receiptStatus');
+ try{
+  const blob=lastReceiptPdfBlob||await buildReceiptPDF();
+  const file=new File([blob],lastReceiptPdfName,{type:'application/pdf'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+   await navigator.share({files:[file],title:'فاتورة Queen Crispy'});
+   status.textContent='تم فتح قائمة المشاركة.';
+  }else{
+   const url=URL.createObjectURL(blob);
+   const a=document.createElement('a');
+   a.href=url;a.download=lastReceiptPdfName;
+   document.body.appendChild(a);a.click();a.remove();
+   setTimeout(()=>URL.revokeObjectURL(url),60000);
+   status.textContent='المشاركة المباشرة غير مدعومة؛ تم تحميل PDF.';
+  }
+ }catch(error){
+  if(error.name!=='AbortError'){
+   console.error(error);
+   alert('تعذرت مشاركة PDF: '+error.message);
+  }
+ }
+}
+
 function finish(){
  let o=createOrder();
  if(o){
   receipt(o);
+  lastReceiptPdfBlob=null;
   $('receiptTools').style.display='block';
-  $('receiptStatus').textContent='الفاتورة جاهزة للطباعة.';
+  $('receiptStatus').textContent='الفاتورة جاهزة لإنشاء PDF.';
   $('receiptTools').scrollIntoView({behavior:'smooth',block:'start'});
  }
 }
@@ -212,9 +288,9 @@ function showHistory(toggle=true){
 function reprint(id){
  let o=orders.find(x=>Number(x.id)===id);
  if(o){
-  receipt(o);
+  receipt(o);lastReceiptPdfBlob=null;
   $('receiptTools').style.display='block';
-  $('receiptStatus').textContent='الفاتورة جاهزة للطباعة.';
+  $('receiptStatus').textContent='الفاتورة جاهزة لإنشاء PDF.';
   $('receiptTools').scrollIntoView({behavior:'smooth',block:'start'});
  }
 }
@@ -242,9 +318,9 @@ function saveShop(){settings.shopName=$('shopName').value.trim()||'Queen Crispy'
 $('logoFile').addEventListener('change',function(){let f=this.files[0];if(!f)return;if(f.size>150000){alert('اختار صورة أصغر من 150KB');this.value='';return}let reader=new FileReader();reader.onload=()=>{settings.logo=String(reader.result);saveSettings();alert('تم حفظ الشعار')};reader.readAsDataURL(f)});
 function testPrint(){
  let o={id:'TEST',time:new Date().toLocaleString('fr-MA'),items:[{name:'تيكي تجريبي',qty:1,price:0}],total:0};
- receipt(o);
+ receipt(o);lastReceiptPdfBlob=null;
  $('receiptTools').style.display='block';
- $('receiptStatus').textContent='فاتورة تجريبية جاهزة للطباعة.';
+ $('receiptStatus').textContent='فاتورة تجريبية جاهزة لإنشاء PDF.';
  $('receiptTools').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function summarize(arr){return `${arr.length} طلب — ${arr.reduce((s,o)=>s+Number(o.total||0),0).toFixed(2)} DH`}
