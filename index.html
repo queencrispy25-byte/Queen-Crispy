@@ -7,7 +7,199 @@
 <link rel="manifest" href="manifest.json">
 <title>Queen Crispy POS</title>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+
+async function createLocalPDF(imageBlob){
+
+ const bitmap=await createImageBitmap(imageBlob);
+
+ const canvas=document.createElement('canvas');
+ canvas.width=bitmap.width;
+ canvas.height=bitmap.height;
+
+ const ctx=canvas.getContext('2d');
+ ctx.fillStyle='#fff';
+ ctx.fillRect(0,0,canvas.width,canvas.height);
+ ctx.drawImage(bitmap,0,0);
+ bitmap.close();
+
+ const jpegBlob=await new Promise((resolve,reject)=>{
+  canvas.toBlob(blob=>{
+   if(blob)resolve(blob);
+   else reject(new Error('JPEG conversion failed'));
+  },'image/jpeg',0.95);
+ });
+
+ const imageBytes=new Uint8Array(await jpegBlob.arrayBuffer());
+
+ const enc=new TextEncoder();
+ const str=s=>enc.encode(s);
+
+ const pageW=74*72/25.4;
+ const pageH=105*72/25.4;
+ const margin=2*72/25.4;
+
+ const scale=Math.min(
+  (pageW-margin*2)/canvas.width,
+  (pageH-margin*2)/canvas.height
+ );
+
+ const imgW=canvas.width*scale;
+ const imgH=canvas.height*scale;
+ const x=(pageW-imgW)/2;
+ const y=(pageH-imgH)/2;
+
+ const content=str(
+  `q\n${imgW.toFixed(3)} 0 0 ${imgH.toFixed(3)} ${x.toFixed(3)} ${y.toFixed(3)} cm\n/Im0 Do\nQ\n`
+ );
+
+ const objects=[
+  str('<< /Type /Catalog /Pages 2 0 R >>'),
+
+  str('<< /Type /Pages /Kids [3 0 R] /Count 1 >>'),
+
+  str(
+   `<< /Type /Page /Parent 2 0 R `+
+   `/MediaBox [0 0 ${pageW.toFixed(3)} ${pageH.toFixed(3)}] `+
+   `/Resources << /XObject << /Im0 4 0 R >> >> `+
+   `/Contents 5 0 R >>`
+  ),
+
+  null,
+
+  str(`<< /Length ${content.length} >>\nstream\n`),
+
+  str(`endstream\n`)
+ ];
+
+ const imageHeader=str(
+  `<< /Type /XObject /Subtype /Image `+
+  `/Width ${canvas.width} /Height ${canvas.height} `+
+  `/ColorSpace /DeviceRGB /BitsPerComponent 8 `+
+  `/Filter /DCTDecode /Length ${imageBytes.length} >>\nstream\n`
+ );
+
+ const chunks=[];
+ let offset=0;
+ const offsets=[0];
+
+ function add(bytes){
+  chunks.push(bytes);
+  offset+=bytes.length;
+ }
+
+ add(str('%PDF-1.4\n'));
+
+ for(let i=0;i<5;i++){
+
+  offsets.push(offset);
+
+  add(str(`${i+1} 0 obj\n`));
+
+  if(i===3){
+   add(imageHeader);
+   add(imageBytes);
+   add(str('\nendstream\n'));
+  }else if(i===4){
+   add(objects[4]);
+   add(content);
+   add(objects[5]);
+  }else{
+   add(objects[i]);
+  }
+
+  add(str('endobj\n'));
+ }
+
+ const xrefOffset=offset;
+
+ let xref='xref\n0 6\n';
+ xref+='0000000000 65535 f \n';
+
+ for(let i=1;i<=5;i++){
+  xref+=String(offsets[i]).padStart(10,'0')+' 00000 n \n';
+ }
+
+ add(str(xref));
+ add(str(
+  `trailer\n<< /Size 6 /Root 1 0 R >>\n`+
+  `startxref\n${xrefOffset}\n%%EOF`
+ ));
+
+ return new Blob(chunks,{type:'application/pdf'});
+}
+
+async function shareReceiptPDF(){
+
+ if(!$('receipt').innerHTML.trim()){
+  alert('ما كايناش فاتورة');
+  return;
+ }
+
+ if(!currentReceiptImageBlob){
+  alert('تسنى حتى تجهز صورة الفاتورة وحاول مرة أخرى.');
+  return;
+ }
+
+ try{
+
+  $('receiptStatus').textContent='جاري إنشاء PDF...';
+
+  const pdfBlob=await createLocalPDF(currentReceiptImageBlob);
+
+  const file=new File(
+   [pdfBlob],
+   `Queen-Crispy-${Date.now()}.pdf`,
+   {type:'application/pdf'}
+  );
+
+  if(
+   navigator.share &&
+   navigator.canShare &&
+   navigator.canShare({files:[file]})
+  ){
+
+   await navigator.share({
+    files:[file],
+    title:'Queen Crispy PDF',
+    text:'فاتورة Queen Crispy بصيغة PDF'
+   });
+
+   $('receiptStatus').textContent=
+    'الفاتورة جاهزة للمشاركة.';
+
+  }else{
+
+   const url=URL.createObjectURL(pdfBlob);
+   const a=document.createElement('a');
+
+   a.href=url;
+   a.download=file.name;
+
+   document.body.appendChild(a);
+   a.click();
+   a.remove();
+
+   setTimeout(()=>URL.revokeObjectURL(url),30000);
+
+   $('receiptStatus').textContent=
+    'تم إنشاء PDF وتحميله بنجاح.';
+
+  }
+
+ }catch(e){
+
+  if(e.name==='AbortError')return;
+
+  console.error(e);
+
+  $('receiptStatus').textContent='تعذر إنشاء PDF.';
+
+  alert('وقع خطأ أثناء إنشاء ملف PDF: '+e.message);
+
+ }
+}
+
+
 
 <style>
 :root{font-family:system-ui,Tahoma,sans-serif;--accent:#ffcf00;--bg:#101010;--panel:#202020;color:#fff;background:var(--bg)}
