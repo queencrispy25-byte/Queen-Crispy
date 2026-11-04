@@ -136,6 +136,7 @@ label{display:block;margin:12px 0 5px}input[type=color]{width:80px;height:42px;p
  <p class="muted">اضغط على طباعة عادية. ومن نافذة الطباعة ديال Android تقدر تختار Save as PDF لحفظ الفاتورة أو مشاركتها.</p>
  <div class="actions">
   <button class="primary" onclick="printReceipt()">🖨️ طباعة / مشاركة PDF</button>
+  <button onclick="shareReceiptImage()">🖼️ مشاركة الفاتورة كصورة</button>
  </div>
  <small id="receiptStatus" class="muted"></small>
 </section>
@@ -195,12 +196,173 @@ function printReceipt(){
  if(!$('receipt').innerHTML.trim()){alert('ما كايناش فاتورة للطباعة');return}
  window.print();
 }
+
+let currentReceiptImageBlob = null;
+let currentReceiptImageName = 'queen-crispy-ticket.png';
+
+function wrapCanvasText(ctx, text, maxWidth) {
+ const words = String(text ?? '').split(/\s+/);
+ const lines = [];
+ let line = '';
+ for (const word of words) {
+  const test = line ? line + ' ' + word : word;
+  if (ctx.measureText(test).width > maxWidth && line) {
+   lines.push(line);
+   line = word;
+  } else {
+   line = test;
+  }
+ }
+ if (line) lines.push(line);
+ return lines;
+}
+
+async function makeReceiptImage(o) {
+ const width = 576, pad = 28, inner = width - pad * 2;
+ const canvas = document.createElement('canvas');
+ const ctx = canvas.getContext('2d');
+ const rows = [];
+
+ function addText(text, font, align='right', gap=18) {
+  ctx.font = font;
+  const lines = wrapCanvasText(ctx, text, inner);
+  rows.push({type:'text', lines, font, align, gap, lineHeight:Math.ceil(parseInt(font,10)*1.55)});
+ }
+
+ if (settings.logo) {
+  try {
+   const logo = new Image();
+   logo.src = settings.logo;
+   await new Promise((resolve, reject) => {
+    logo.onload = resolve;
+    logo.onerror = reject;
+   });
+   rows.push({type:'logo', image:logo, height:100});
+  } catch(e) {}
+ }
+
+ addText(settings.shopName || 'Queen Crispy', 'bold 32px Tahoma', 'center', 18);
+ if (settings.shopAddress) addText(settings.shopAddress, '23px Tahoma', 'center', 12);
+ if (settings.shopPhone) addText(settings.shopPhone, '22px Tahoma', 'center', 12);
+ addText('طلب رقم: ' + o.id, '23px Tahoma', 'right', 8);
+ addText(o.time, '20px Tahoma', 'right', 12);
+ rows.push({type:'rule', height:22});
+
+ for (const item of (o.items || [])) {
+  const name = `${item.name} × ${item.qty}`;
+  ctx.font = '22px Tahoma';
+  const nameLines = wrapCanvasText(ctx, name, inner * .65);
+  rows.push({
+   type:'item', nameLines,
+   amount:(Number(item.qty)*Number(item.price)).toFixed(2)+' DH',
+   height:Math.max(52,nameLines.length*34+12)
+  });
+ }
+ rows.push({type:'rule', height:22});
+ addText('المجموع: ' + Number(o.total).toFixed(2) + ' DH', 'bold 29px Tahoma', 'right', 18);
+ addText(settings.thankYou || 'شكراً على زيارتكم!', 'bold 23px Tahoma', 'center', 20);
+
+ const height = pad * 2 + rows.reduce((sum,row)=>sum+(row.height || row.lineHeight*row.lines.length+row.gap || 0),0)+20;
+ canvas.width = width * 2;
+ canvas.height = height * 2;
+ ctx.scale(2,2);
+ ctx.fillStyle = '#fff';
+ ctx.fillRect(0,0,width,height);
+ ctx.fillStyle = '#000';
+ ctx.textBaseline = 'top';
+ let y = pad;
+
+ for (const row of rows) {
+  if (row.type === 'logo') {
+   const w = Math.min(90,row.image.width);
+   const h = Math.min(90,row.image.height);
+   ctx.drawImage(row.image,(width-w)/2,y,w,h);
+   y += row.height;
+  } else if (row.type === 'rule') {
+   ctx.save();
+   ctx.setLineDash([6,5]);
+   ctx.strokeStyle = '#777';
+   ctx.beginPath();
+   ctx.moveTo(pad,y+8);
+   ctx.lineTo(width-pad,y+8);
+   ctx.stroke();
+   ctx.restore();
+   y += row.height;
+  } else if (row.type === 'item') {
+   ctx.font = '22px Tahoma';
+   ctx.direction = 'rtl';
+   ctx.textAlign = 'right';
+   row.nameLines.forEach((line,index)=>ctx.fillText(line,width-pad,y+index*34,inner*.65));
+   ctx.font = 'bold 21px Tahoma';
+   ctx.direction = 'ltr';
+   ctx.textAlign = 'left';
+   ctx.fillText(row.amount,pad,y+8,inner*.30);
+   y += row.height;
+  } else {
+   ctx.font = row.font;
+   ctx.direction = 'rtl';
+   ctx.textAlign = row.align;
+   const x = row.align === 'center' ? width/2 : width-pad;
+   row.lines.forEach((line,index)=>ctx.fillText(line,x,y+index*row.lineHeight,inner));
+   y += row.lineHeight*row.lines.length+row.gap;
+  }
+ }
+
+ return await new Promise(resolve => canvas.toBlob(resolve,'image/png'));
+}
+
+async function prepareReceiptImage(o) {
+ currentReceiptImageBlob = null;
+ currentReceiptImageName = `queen-crispy-${o.id}.png`;
+ $('receiptStatus').textContent = 'جاري تجهيز صورة الفاتورة...';
+ try {
+  currentReceiptImageBlob = await makeReceiptImage(o);
+  if (!currentReceiptImageBlob) throw new Error('PNG generation failed');
+  $('receiptStatus').textContent = 'الفاتورة جاهزة للطباعة والمشاركة كصورة.';
+ } catch(e) {
+  console.error(e);
+  $('receiptStatus').textContent = 'تعذر تجهيز صورة الفاتورة.';
+ }
+}
+
+async function shareReceiptImage() {
+ if (!currentReceiptImageBlob) {
+  alert('صورة الفاتورة مازال كتوجد. انتظر قليلاً ثم حاول مرة أخرى.');
+  return;
+ }
+ const file = new File([currentReceiptImageBlob],currentReceiptImageName,{type:'image/png'});
+ try {
+  if (navigator.share && navigator.canShare && navigator.canShare({files:[file]})) {
+   await navigator.share({
+    files:[file],
+    title:'Queen Crispy - فاتورة',
+    text:'فاتورة طلب Queen Crispy'
+   });
+   $('receiptStatus').textContent = 'تم فتح قائمة المشاركة. اختار التطبيق المناسب.';
+   return;
+  }
+  const url = URL.createObjectURL(currentReceiptImageBlob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = currentReceiptImageName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),10000);
+  $('receiptStatus').textContent = 'المشاركة المباشرة غير مدعومة؛ تم تحميل صورة الفاتورة.';
+ } catch(e) {
+  if (e.name === 'AbortError') return;
+  console.error(e);
+  alert('تعذرت مشاركة الصورة على هذا المتصفح.');
+ }
+}
 function finish(){
  let o=createOrder();
  if(o){
   receipt(o);
   $('receiptTools').style.display='block';
   $('receiptStatus').textContent='الفاتورة جاهزة للطباعة.';
+  prepareReceiptImage(o);
   $('receiptTools').scrollIntoView({behavior:'smooth',block:'start'});
  }
 }
@@ -215,6 +377,7 @@ function reprint(id){
   receipt(o);
   $('receiptTools').style.display='block';
   $('receiptStatus').textContent='الفاتورة جاهزة للطباعة.';
+  prepareReceiptImage(o);
   $('receiptTools').scrollIntoView({behavior:'smooth',block:'start'});
  }
 }
@@ -245,6 +408,7 @@ function testPrint(){
  receipt(o);
  $('receiptTools').style.display='block';
  $('receiptStatus').textContent='فاتورة تجريبية جاهزة للطباعة.';
+ prepareReceiptImage(o);
  $('receiptTools').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function summarize(arr){return `${arr.length} طلب — ${arr.reduce((s,o)=>s+Number(o.total||0),0).toFixed(2)} DH`}
