@@ -28,7 +28,8 @@ button.primary{background:var(--accent);color:#111}button.danger{background:#a32
 input,select,textarea{background:#292929;color:#fff;border:1px solid #666;border-radius:8px;padding:10px;width:100%;font:inherit}
 label{display:block;margin:12px 0 5px}input[type=color]{width:80px;height:42px;padding:3px}
 .fieldgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
-.hidden{display:none!important}.setting-section{border-top:1px solid #444;margin-top:20px;padding-top:10px}
+.hidden{display:none!important}.sauce-modal{display:none;position:fixed;inset:0;background:#000b;z-index:9999;align-items:center;justify-content:center;padding:18px}.sauce-modal.open{display:flex}.sauce-box{width:min(100%,420px);background:#202020;border:1px solid #ffcf00;border-radius:14px;padding:18px;box-shadow:0 10px 35px #0008}.sauce-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}.sauce-options button{padding:14px 8px}.receipt-sauce{display:block;font-size:.78em;color:#555;margin-top:2px;font-weight:400}.item-comment{display:block;font-size:12px;color:#ffd966;margin-top:5px;white-space:pre-wrap}.receipt-comment{display:block;font-size:.78em;color:#555;margin-top:2px;font-weight:400;white-space:pre-wrap}
+.setting-section{border-top:1px solid #444;margin-top:20px;padding-top:10px}
 .setting-section:first-of-type{border:0}.setting-section .actions button{min-width:120px}
 #receipt{display:none;color:#000;background:#fff}
 #receiptTools{display:none;background:var(--panel);border:1px solid #594c13;border-radius:12px;padding:14px;margin-top:14px}
@@ -38,21 +39,12 @@ label{display:block;margin:12px 0 5px}input[type=color]{width:80px;height:42px;p
 @media(min-width:700px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media print{
   @page{size:74mm 105mm;margin:0}
-  html,body{
-    background:#fff!important;color:#000!important;
-    margin:0!important;padding:0!important;
-    width:74mm!important;min-width:74mm!important;max-width:74mm!important;
-  }
+  html,body{background:#fff!important;color:#000!important;margin:0!important;padding:0!important;width:74mm!important;min-width:74mm!important;max-width:74mm!important}
   body>*:not(#receipt){display:none!important}
-  #receipt{
-    display:block!important;visibility:visible!important;position:static!important;
-    width:74mm!important;max-width:74mm!important;margin:0!important;padding:2mm!important;
-    box-sizing:border-box!important;background:#fff!important;color:#000!important;
-    font:12px Tahoma,Arial,sans-serif!important;direction:rtl!important;overflow:visible!important;
-  }
-  #receipt h2{text-align:center;font-size:17px}
+  #receipt{display:block!important;visibility:visible!important;position:static!important;width:74mm!important;max-width:74mm!important;margin:0!important;padding:var(--receipt-top,2mm) 2mm 2mm!important;box-sizing:border-box!important;background:#fff!important;color:var(--receipt-text-color,#000)!important;font-family:Tahoma,Arial,sans-serif!important;font-size:var(--receipt-font-size,12px)!important;direction:rtl!important;overflow:visible!important;transform:translateX(var(--receipt-x,0mm))!important}
+  #receipt h2{text-align:center;font-size:1.35em}
   #receipt .line{border-bottom:1px dashed #777}
-  #receipt .total{color:#000!important}
+  #receipt .total{color:var(--receipt-text-color,#000)!important}
   #receipt p{text-align:center}
   #receipt img{max-width:60px;max-height:60px}
 }
@@ -73,7 +65,7 @@ label{display:block;margin:12px 0 5px}input[type=color]{width:80px;height:42px;p
    <button class="primary" onclick="finish()">تأكيد الطلب وطباعة التيكي</button>
    <button onclick="saveOnly()">حفظ بلا طباعة</button><button class="danger" onclick="clearCart()">مسح السلة</button>
   </div>
-  <small>الفاتورة كتطبع مباشرة، ويمكن اختيار Save as PDF من نافذة الطباعة.</small>
+  <small>الفاتورة كتوجد، ويمكن فتحها ومشاركتها كملف PDF.</small>
  </section>
  <section id="history"><h2>📊 مبيعات اليوم</h2><div id="stats"></div><button onclick="showHistory()">عرض آخر الطلبات</button><div id="orders"></div></section>
 </main>
@@ -100,9 +92,15 @@ label{display:block;margin:12px 0 5px}input[type=color]{width:80px;height:42px;p
   <div class="actions"><button class="primary" onclick="saveShop()">حفظ معلومات التيكي</button><button onclick="testPrint()">تجربة الفاتورة</button></div>
  </section>
  <section class="setting-section">
-  <h3>🖨️ إعدادات الطابعة</h3>
-  <p class="muted">مقاس التيكي مضبوط على ISO A7 (74 × 105 mm). الطباعة كتستعمل نافذة الطباعة ديال Android/Chrome.</p>
-  <button class="primary" onclick="testPrint()">تجربة الطباعة A7</button>
+  <h3>🖨️ إعدادات الطابعة و PDF</h3>
+  <p class="muted">تحكم فحجم الكتابة ولونها ومكانها داخل ورقة ISO A7 (74 × 105 mm). الإعدادات كتتحفظ تلقائياً.</p>
+  <div class="fieldgrid">
+   <div><label>حجم الكتابة: <strong id="receiptFontSizeLabel">12</strong> px</label><input id="receiptFontSize" type="range" min="8" max="18" step="1" value="12" oninput="updateReceiptDesign()"></div>
+   <div><label>لون الكتابة</label><input id="receiptTextColor" type="color" value="#000000" oninput="updateReceiptDesign()"></div>
+   <div><label>المكان العمودي (من الفوق): <strong id="receiptTopLabel">2</strong> mm</label><input id="receiptTop" type="range" min="0" max="25" step="1" value="2" oninput="updateReceiptDesign()"></div>
+   <div><label>المكان الأفقي: <strong id="receiptXLabel">0</strong> mm</label><input id="receiptX" type="range" min="-10" max="10" step="1" value="0" oninput="updateReceiptDesign()"></div>
+  </div>
+  <div class="actions"><button class="primary" onclick="saveReceiptDesign()">حفظ إعدادات الطباعة</button><button onclick="resetReceiptDesign()">إرجاع الإعدادات الأصلية</button><button onclick="testPrint()">تجربة الطباعة A7</button></div>
  </section>
  <section class="setting-section">
   <h3>📊 المبيعات والتقارير</h3><div id="reports"></div>
@@ -130,16 +128,37 @@ label{display:block;margin:12px 0 5px}input[type=color]{width:80px;height:42px;p
  </section>
 </main>
 
+<div id="sauceModal" class="sauce-modal" role="dialog" aria-modal="true" aria-labelledby="sauceTitle">
+ <div class="sauce-box">
+  <h2 id="sauceTitle">اختار الصوص</h2>
+  <p id="sauceProductName" class="muted"></p>
+  <div class="sauce-options" id="sauceOptions">
+   <button onclick="chooseSauce('ألجيريان')">ألجيريان</button>
+   <button onclick="chooseSauce('بيغي')">بيغي</button>
+   <button onclick="chooseSauce('كيتشاب')">كيتشاب</button>
+   <button onclick="chooseSauce('مايونيز')">مايونيز</button>
+   <button onclick="chooseSauce('باربيكيو')">باربيكيو</button>
+   <button onclick="chooseSauce('حار')">حار</button>
+  </div>
+  <button class="outline" style="width:100%;margin-top:9px" onclick="chooseSauce('')">بدون صوص / إضافة المنتوج</button>
+  <label for="itemComment">📝 Commentaire / ملاحظة على المنتوج</label>
+  <textarea id="itemComment" rows="3" placeholder="مثلاً: بلا بصل، بلا خس، زيادة الدجاج..."></textarea>
+  <div class="actions"><button class="outline" onclick="closeSaucePicker()">إلغاء</button></div>
+ </div>
+</div>
 <section id="receipt"></section>
 <section id="receiptTools">
  <h3>🧾 فاتورة Queen Crispy</h3>
- <p class="muted">اضغط على طباعة عادية. ومن نافذة الطباعة ديال Android تقدر تختار Save as PDF لحفظ الفاتورة أو مشاركتها.</p>
+ <p class="muted">اختار الطباعة العادية أو مشاركة الفاتورة كملف PDF بمقاس A7.</p>
  <div class="actions">
-  <button class="primary" onclick="printReceipt()">🖨️ طباعة / مشاركة PDF</button>
+  <button class="primary" onclick="printReceipt()">🖨️ طباعة عادية</button>
+  <button onclick="shareReceiptPDF()">📤 مشاركة PDF</button>
  </div>
  <small id="receiptStatus" class="muted"></small>
 </section>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 const defaultProducts=[
  ['سندويش نورمال',10,'سندويشات'],['سندويش دجاج',15,'سندويشات'],['سندويش كفتة',17,'سندويشات'],
@@ -156,8 +175,8 @@ const storage={
 let products=storage.get('qc_products',defaultProducts.map(p=>[...p]));
 if(!Array.isArray(products))products=defaultProducts.map(p=>[...p]);
 let orders=storage.get('qc_orders',[]);if(!Array.isArray(orders))orders=[];
-let settings=Object.assign({shopName:'Queen Crispy',shopAddress:'القنيطرة — اليانس دارنا',shopPhone:'',thankYou:'شكراً على زيارتكم!',paperSize:'A7',accent:'#ffcf00',logo:''},storage.get('qc_settings',{}));
-let category=products[0]?.[2]||'',cart={},historyOpen=false;
+let settings=Object.assign({shopName:'Queen Crispy',shopAddress:'القنيطرة — اليانس دارنا',shopPhone:'',thankYou:'شكراً على زيارتكم!',paperSize:'A7',accent:'#ffcf00',logo:'',receiptFontSize:12,receiptTextColor:'#000000',receiptTop:2,receiptX:0},storage.get('qc_settings',{}));
+let category=products[0]?.[2]||'',cart=[],historyOpen=false,pendingSauceProduct=null;
 const $=id=>document.getElementById(id);
 const escapeHtml=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function persist(){return storage.set('qc_orders',orders)}
@@ -165,42 +184,148 @@ function saveProducts(){return storage.set('qc_products',products)}
 function saveSettings(){return storage.set('qc_settings',settings)}
 function dayKey(d=new Date()){return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')}
 function orderNumber(){return Math.max(Number(storage.get('qc_next_order',1))||1,orders.reduce((m,o)=>Math.max(m,Number(o.id)||0),0)+1)}
-function total(){return Object.keys(cart).reduce((s,k)=>s+(Number(products[k]?.[1])||0)*cart[k],0)}
+function total(){return cart.reduce((s,line)=>s+(Number(products[line.productIndex]?.[1])||0)*line.qty,0)}
+function needsSauce(p){const c=String(p?.[2]||'').toLowerCase();return /سندويش|ساندويش|برغر|برجر|burger|tacos|طاكوس|تاكوس|أطباق|اطباق|plats/.test(c)}
+function openSaucePicker(i){
+ pendingSauceProduct=i;
+ $('sauceProductName').textContent=products[i]?.[0]||'';
+ const needs=needsSauce(products[i]);
+ $('sauceTitle').textContent=needs?'اختار الصوص':'ملاحظة على المنتوج';
+ $('sauceOptions').style.display=needs?'grid':'none';
+ $('itemComment').value='';
+ $('sauceModal').classList.add('open');
+}
+function closeSaucePicker(){$('sauceModal').classList.remove('open');pendingSauceProduct=null}
+function chooseSauce(sauce){
+ if(pendingSauceProduct===null)return;
+ const comment=$('itemComment').value.trim();
+ addProductToCart(pendingSauceProduct,sauce,comment);
+ closeSaucePicker();
+}
+function addProductToCart(i,sauce='',comment=''){
+ let line=cart.find(x=>x.productIndex===i&&(x.sauce||'')===sauce&&(x.comment||'')===comment);
+ if(line)line.qty++;
+ else cart.push({productIndex:i,sauce,comment,qty:1});
+ render();
+}
+function changeCartLine(lineIndex,delta){if(!cart[lineIndex])return;cart[lineIndex].qty+=delta;if(cart[lineIndex].qty<=0)cart.splice(lineIndex,1);render()}
 function render(){
  let cats=[...new Set(products.map(p=>p[2]))];if(!cats.includes(category))category=cats[0]||'';
  $('tabs').innerHTML=cats.map((c,i)=>`<button class="${category===c?'active':''}" onclick="setCategory(${i})">${escapeHtml(c)}</button>`).join('');
- $('products').innerHTML=products.map((p,i)=>p[2]===category?`<button class="product ${cart[i]>0?'selected':''}" onclick="add(${i})"><strong>${escapeHtml(p[0])}</strong><div class="price">${Number(p[1])} DH +</div></button>`:'').join('');
+ $('products').innerHTML=products.map((p,i)=>p[2]===category?`<button class="product ${cart.some(x=>x.productIndex===i)?'selected':''}" onclick="openSaucePicker(${i})"><strong>${escapeHtml(p[0])}</strong><div class="price">${Number(p[1])} DH +</div></button>`:'').join('');
  $('number').textContent='#'+orderNumber();
- let keys=Object.keys(cart).filter(k=>cart[k]>0&&products[k]);
- $('lines').innerHTML=keys.length?keys.map(k=>`<div class="line selected"><span>${escapeHtml(products[k][0])} × ${cart[k]}</span><span>${(products[k][1]*cart[k]).toFixed(2)} DH <button onclick="add(${k},-1)">−</button><button onclick="add(${k})">+</button></span></div>`).join(''):'اختار المنتجات من الفوق';
+ $('lines').innerHTML=cart.length?cart.map((line,j)=>{const p=products[line.productIndex];if(!p)return '';return `<div class="line selected"><span>${escapeHtml(p[0])}${line.sauce?`<small class="receipt-sauce">الصوص: ${escapeHtml(line.sauce)}</small>`:''}${line.comment?`<small class="item-comment">📝 ${escapeHtml(line.comment)}</small>`:''} × ${line.qty}</span><span>${(Number(p[1])*line.qty).toFixed(2)} DH <button onclick="changeCartLine(${j},-1)">−</button><button onclick="changeCartLine(${j},1)">+</button></span></div>`}).join(''):'اختار المنتجات من الفوق';
  $('total').textContent=total().toFixed(2)+' DH';
  let today=orders.filter(o=>o.day===dayKey());
  $('stats').textContent=`${today.length} طلبات — ${today.reduce((s,o)=>s+Number(o.total||0),0).toFixed(2)} DH`;
  if(historyOpen)showHistory(false);
 }
 function setCategory(i){category=[...new Set(products.map(p=>p[2]))][i];render()}
-function add(i,n=1){cart[i]=Math.max(0,(cart[i]||0)+n);render()}
-function clearCart(){cart={};render()}
+function add(i,n=1){if(n>0)addProductToCart(i);else{const line=cart.findIndex(x=>x.productIndex===i);if(line>=0)changeCartLine(line,-1)}}
+function clearCart(){cart=[];render()}
 function createOrder(){
- if(!Object.keys(cart).some(k=>cart[k]>0)){alert('الطلب فارغ');return null}
+ if(!cart.length){alert('الطلب فارغ');return null}
  let now=new Date(),id=orderNumber();
- let o={id,day:dayKey(now),time:now.toLocaleString('fr-MA'),items:Object.keys(cart).filter(k=>cart[k]>0&&products[k]).map(k=>({name:products[k][0],qty:cart[k],price:Number(products[k][1])})),total:total()};
+ let o={id,day:dayKey(now),time:now.toLocaleString('fr-MA'),items:cart.filter(line=>products[line.productIndex]).map(line=>({name:products[line.productIndex][0],qty:line.qty,price:Number(products[line.productIndex][1]),sauce:line.sauce||'',comment:line.comment||''})),total:total()};
  orders.push(o);if(!persist()){orders.pop();return null}
  storage.set('qc_next_order',id+1);clearCart();return o;
 }
 function receipt(o){
- $('receipt').innerHTML=`${settings.logo?`<p><img src="${settings.logo}" alt="شعار"></p>`:''}<h2>${escapeHtml(settings.shopName)}</h2><p>${escapeHtml(settings.shopAddress)}</p>${settings.shopPhone?`<p>${escapeHtml(settings.shopPhone)}</p>`:''}<div>طلب رقم: ${escapeHtml(o.id)}</div><div>${escapeHtml(o.time)}</div><hr>${o.items.map(x=>`<div class="line"><span>${escapeHtml(x.name)} × ${Number(x.qty)}</span><span>${(Number(x.qty)*Number(x.price)).toFixed(2)} DH</span></div>`).join('')}<hr><div class="line total">المجموع: ${Number(o.total).toFixed(2)} DH</div><p>${escapeHtml(settings.thankYou)}</p>`;
+ $('receipt').innerHTML=`${settings.logo?`<p><img src="${settings.logo}" alt="شعار"></p>`:''}<h2>${escapeHtml(settings.shopName)}</h2><p>${escapeHtml(settings.shopAddress)}</p>${settings.shopPhone?`<p>${escapeHtml(settings.shopPhone)}</p>`:''}<div>طلب رقم: ${escapeHtml(o.id)}</div><div>${escapeHtml(o.time)}</div><hr>${o.items.map(x=>`<div class="line"><span>${escapeHtml(x.name)}${x.sauce?`<small class="receipt-sauce">الصوص: ${escapeHtml(x.sauce)}</small>`:''}${x.comment?`<small class="receipt-comment">ملاحظة: ${escapeHtml(x.comment)}</small>`:''} × ${Number(x.qty)}</span><span>${(Number(x.qty)*Number(x.price)).toFixed(2)} DH</span></div>`).join('')}<hr><div class="line total">المجموع: ${Number(o.total).toFixed(2)} DH</div><p>${escapeHtml(settings.thankYou)}</p>`; applyReceiptDesign();
 }
+
+/* إنشاء PDF حقيقي A7 مباشرة وفتحه في الهاتف */
+let lastReceiptPdfBlob=null;
+let lastReceiptPdfName='Queen-Crispy-receipt.pdf';
+
+async function buildReceiptPDF(){
+ const receiptEl=$('receipt');
+ applyReceiptDesign();
+ if(!receiptEl.innerHTML.trim())throw new Error('ما كايناش فاتورة للطباعة');
+ if(!window.html2canvas||!window.jspdf)throw new Error('مكتبات PDF غير متوفرة. اتصل بالإنترنت وحاول مجدداً.');
+
+ const oldStyle=receiptEl.getAttribute('style');
+ try{
+  receiptEl.style.cssText=[
+   'display:block','position:fixed','left:-10000px','top:0',
+   'width:70mm','padding:2mm','margin:0','background:#fff',
+   `color:${settings.receiptTextColor||'#000000'}`,'direction:rtl','visibility:visible',
+   `font:${Number(settings.receiptFontSize)||12}px Tahoma,Arial,sans-serif`,`padding-top:${Number(settings.receiptTop)||0}mm`,`transform:translateX(${Number(settings.receiptX)||0}mm)`,'box-sizing:border-box'
+  ].join(';');
+
+  const imgs=[...receiptEl.querySelectorAll('img')];
+  await Promise.all(imgs.map(img=>{
+   if(img.complete)return Promise.resolve();
+   return new Promise(resolve=>{img.onload=resolve;img.onerror=resolve;});
+  }));
+
+  const canvas=await html2canvas(receiptEl,{
+   scale:3,backgroundColor:'#ffffff',useCORS:true,logging:false
+  });
+
+  const {jsPDF}=window.jspdf;
+  const pdf=new jsPDF({
+   orientation:'portrait',unit:'mm',format:[74,105],compress:true
+  });
+
+  const imgData=canvas.toDataURL('image/jpeg',0.95);
+  const drawWidth=70;
+  const drawHeight=canvas.height*drawWidth/canvas.width;
+  const maxHeight=101;
+
+  /* إذا كانت الفاتورة طويلة، تصغّر بشكل متناسب لتبقى داخل صفحة A7 */
+  const ratio=Math.min(1,maxHeight/drawHeight);
+  pdf.addImage(imgData,'JPEG',2,2,drawWidth*ratio,drawHeight*ratio,undefined,'FAST');
+
+  lastReceiptPdfBlob=pdf.output('blob');
+  lastReceiptPdfName='Queen-Crispy-'+Date.now()+'.pdf';
+  return lastReceiptPdfBlob;
+ }finally{
+  if(oldStyle===null)receiptEl.removeAttribute('style');
+  else receiptEl.setAttribute('style',oldStyle);
+ }
+}
+
 function printReceipt(){
- if(!$('receipt').innerHTML.trim()){alert('ما كايناش فاتورة للطباعة');return}
+ if(!$('receipt').innerHTML.trim()){
+  alert('ما كايناش فاتورة للطباعة');
+  return;
+ }
+ $('receiptStatus').textContent='تم فتح نافذة الطباعة. اختار الطابعة أو حفظ PDF من إعدادات الهاتف.';
  window.print();
 }
+
+async function shareReceiptPDF(){
+ const status=$('receiptStatus');
+ try{
+  const blob=lastReceiptPdfBlob||await buildReceiptPDF();
+  const file=new File([blob],lastReceiptPdfName,{type:'application/pdf'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){
+   await navigator.share({files:[file],title:'فاتورة Queen Crispy'});
+   status.textContent='تم فتح قائمة المشاركة.';
+  }else{
+   const url=URL.createObjectURL(blob);
+   const a=document.createElement('a');
+   a.href=url;a.download=lastReceiptPdfName;
+   document.body.appendChild(a);a.click();a.remove();
+   setTimeout(()=>URL.revokeObjectURL(url),60000);
+   status.textContent='المشاركة المباشرة غير مدعومة؛ تم تحميل PDF.';
+  }
+ }catch(error){
+  if(error.name!=='AbortError'){
+   console.error(error);
+   alert('تعذرت مشاركة PDF: '+error.message);
+  }
+ }
+}
+
 function finish(){
  let o=createOrder();
  if(o){
   receipt(o);
+  lastReceiptPdfBlob=null;
   $('receiptTools').style.display='block';
-  $('receiptStatus').textContent='الفاتورة جاهزة للطباعة.';
+  $('receiptStatus').textContent='الفاتورة جاهزة لإنشاء PDF.';
   $('receiptTools').scrollIntoView({behavior:'smooth',block:'start'});
  }
 }
@@ -212,16 +337,52 @@ function showHistory(toggle=true){
 function reprint(id){
  let o=orders.find(x=>Number(x.id)===id);
  if(o){
-  receipt(o);
+  receipt(o);lastReceiptPdfBlob=null;
   $('receiptTools').style.display='block';
-  $('receiptStatus').textContent='الفاتورة جاهزة للطباعة.';
+  $('receiptStatus').textContent='الفاتورة جاهزة لإنشاء PDF.';
   $('receiptTools').scrollIntoView({behavior:'smooth',block:'start'});
  }
 }
 function showView(view){$('posView').classList.toggle('hidden',view!=='pos');$('settingsView').classList.toggle('hidden',view!=='settings');$('homeBtn').classList.toggle('primary',view==='pos');$('settingsBtn').classList.toggle('primary',view==='settings');if(view==='pos')render();window.scrollTo(0,0)}
 function checkPin(){let pin=storage.get('qc_pin','');if(!pin)return true;return prompt('دخل رمز PIN ديال الإعدادات')===pin}
 function openSettings(){if(!checkPin()){alert('رمز PIN غير صحيح');return}loadSettings();showView('settings')}
-function loadSettings(){$('shopName').value=settings.shopName;$('shopAddress').value=settings.shopAddress;$('shopPhone').value=settings.shopPhone;$('thankYou').value=settings.thankYou;$('accentColor').value=settings.accent;renderProductEditor();renderReports()}
+function applyReceiptDesign(){
+ const el=$('receipt');
+ const size=Math.min(18,Math.max(8,Number(settings.receiptFontSize)||12));
+ const color=/^#[0-9a-f]{6}$/i.test(settings.receiptTextColor)?settings.receiptTextColor:'#000000';
+ const top=Math.min(25,Math.max(0,Number(settings.receiptTop)||0));
+ const x=Math.min(10,Math.max(-10,Number(settings.receiptX)||0));
+ el.style.setProperty('--receipt-font-size',size+'px');
+ el.style.setProperty('--receipt-text-color',color);
+ el.style.setProperty('--receipt-top',top+'mm');
+ el.style.setProperty('--receipt-x',x+'mm');
+ el.style.color=color;el.style.fontSize=size+'px';
+}
+function loadReceiptDesignControls(){
+ $('receiptFontSize').value=settings.receiptFontSize??12;
+ $('receiptTextColor').value=settings.receiptTextColor||'#000000';
+ $('receiptTop').value=settings.receiptTop??2;
+ $('receiptX').value=settings.receiptX??0;
+ updateReceiptDesign(false);
+}
+function updateReceiptDesign(save=true){
+ settings.receiptFontSize=Number($('receiptFontSize').value);
+ settings.receiptTextColor=$('receiptTextColor').value;
+ settings.receiptTop=Number($('receiptTop').value);
+ settings.receiptX=Number($('receiptX').value);
+ $('receiptFontSizeLabel').textContent=settings.receiptFontSize;
+ $('receiptTopLabel').textContent=settings.receiptTop;
+ $('receiptXLabel').textContent=settings.receiptX;
+ applyReceiptDesign();
+ if(save)saveSettings();
+ if($('receipt').innerHTML.trim())lastReceiptPdfBlob=null;
+}
+function saveReceiptDesign(){updateReceiptDesign();alert('تحفظات إعدادات الطباعة بنجاح')}
+function resetReceiptDesign(){
+ settings.receiptFontSize=12;settings.receiptTextColor='#000000';settings.receiptTop=2;settings.receiptX=0;
+ loadReceiptDesignControls();saveSettings();if($('receipt').innerHTML.trim())lastReceiptPdfBlob=null;
+}
+function loadSettings(){loadReceiptDesignControls();$('shopName').value=settings.shopName;$('shopAddress').value=settings.shopAddress;$('shopPhone').value=settings.shopPhone;$('thankYou').value=settings.thankYou;$('accentColor').value=settings.accent;renderProductEditor();renderReports()}
 function renderProductEditor(){
  $('productEditor').innerHTML=products.map((p,i)=>`<div class="line"><div style="flex:1"><strong>${escapeHtml(p[0])}</strong><br><small>${escapeHtml(p[2])} — ${Number(p[1])} DH</small></div><button onclick="editProduct(${i})">تعديل</button><button class="danger" onclick="deleteProduct(${i})">حذف</button></div>`).join('');
  $('catList').innerHTML=[...new Set(products.map(p=>p[2]))].map(c=>`<option value="${escapeHtml(c)}"></option>`).join('');
@@ -232,7 +393,7 @@ function editProduct(i){
  let cat=prompt('الصنف',p[2]);if(cat===null)return;cat=cat.trim();if(!cat)return alert('الصنف مطلوب');
  products[i]=[name,Number(price),cat];saveProducts();renderProductEditor();render();
 }
-function deleteProduct(i){if(!confirm('حذف '+products[i][0]+' من المنيو؟ الطلبات القديمة غادي تبقى محفوظة.'))return;products.splice(i,1);cart={};saveProducts();renderProductEditor();render()}
+function deleteProduct(i){if(!confirm('حذف '+products[i][0]+' من المنيو؟ الطلبات القديمة غادي تبقى محفوظة.'))return;products.splice(i,1);cart=[];saveProducts();renderProductEditor();render()}
 function addProduct(){
  let name=$('newName').value.trim(),price=$('newPrice').value,cat=$('newCategory').value.trim();
  if(!name||!cat||price===''||!Number.isFinite(Number(price))||Number(price)<0)return alert('دخل الاسم والثمن الصحيح والصنف');
@@ -242,9 +403,9 @@ function saveShop(){settings.shopName=$('shopName').value.trim()||'Queen Crispy'
 $('logoFile').addEventListener('change',function(){let f=this.files[0];if(!f)return;if(f.size>150000){alert('اختار صورة أصغر من 150KB');this.value='';return}let reader=new FileReader();reader.onload=()=>{settings.logo=String(reader.result);saveSettings();alert('تم حفظ الشعار')};reader.readAsDataURL(f)});
 function testPrint(){
  let o={id:'TEST',time:new Date().toLocaleString('fr-MA'),items:[{name:'تيكي تجريبي',qty:1,price:0}],total:0};
- receipt(o);
+ receipt(o);lastReceiptPdfBlob=null;
  $('receiptTools').style.display='block';
- $('receiptStatus').textContent='فاتورة تجريبية جاهزة للطباعة.';
+ $('receiptStatus').textContent='فاتورة تجريبية جاهزة لإنشاء PDF.';
  $('receiptTools').scrollIntoView({behavior:'smooth',block:'start'});
 }
 function summarize(arr){return `${arr.length} طلب — ${arr.reduce((s,o)=>s+Number(o.total||0),0).toFixed(2)} DH`}
@@ -254,7 +415,7 @@ function renderReports(){
 }
 function download(name,content,type){let blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 function exportCSV(){
- let rows=[['رقم الطلب','التاريخ','الوقت','المنتجات','المجموع DH'],...orders.map(o=>[o.id,o.day,o.time,(o.items||[]).map(i=>`${i.name} x${i.qty}`).join(' | '),o.total])];
+ let rows=[['رقم الطلب','التاريخ','الوقت','المنتجات','المجموع DH'],...orders.map(o=>[o.id,o.day,o.time,(o.items||[]).map(i=>`${i.name}${i.sauce?' - صوص: '+i.sauce:''}${i.comment?' - ملاحظة: '+i.comment:''} x${i.qty}`).join(' | '),o.total])];
  let csv='\uFEFF'+rows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
  download('queen-crispy-orders-'+dayKey()+'.csv',csv,'text/csv;charset=utf-8');
 }
@@ -273,7 +434,7 @@ async function restoreBackup(){
  products=data.products;orders=data.orders;settings=Object.assign(settings,data.settings||{});
  storage.set('qc_products',products);persist();saveSettings();
  storage.set('qc_next_order',Math.max(Number(data.nextOrder)||1,orders.reduce((m,o)=>Math.max(m,Number(o.id)||0),0)+1));
- cart={};applyAppearance();loadSettings();render();alert('تم استرجاع النسخة الاحتياطية');
+ cart=[];applyAppearance();loadSettings();render();alert('تم استرجاع النسخة الاحتياطية');
 }
 function setPin(){let v=$('newPin').value;if(!/^\d{4,8}$/.test(v))return alert('دخل 4 حتى 8 أرقام');if(!checkPin())return alert('PIN القديم غير صحيح');storage.set('qc_pin',v);$('newPin').value='';alert('تم حفظ PIN')}
 function removePin(){if(!checkPin())return alert('PIN غير صحيح');if(confirm('إلغاء حماية PIN؟')){localStorage.removeItem('qc_pin');alert('تم إلغاء PIN')}}
