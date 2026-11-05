@@ -28,10 +28,11 @@ button.primary{background:var(--accent);color:#111}button.danger{background:#a32
 input,select,textarea{background:#292929;color:#fff;border:1px solid #666;border-radius:8px;padding:10px;width:100%;font:inherit}
 label{display:block;margin:12px 0 5px}input[type=color]{width:80px;height:42px;padding:3px}
 .fieldgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
-.hidden{display:none!important}.sauce-modal{display:none;position:fixed;inset:0;background:#000b;z-index:9999;align-items:center;justify-content:center;padding:18px}.sauce-modal.open{display:flex}.sauce-box{width:min(100%,420px);background:#202020;border:1px solid #ffcf00;border-radius:14px;padding:18px;box-shadow:0 10px 35px #0008}.sauce-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}.sauce-options button{padding:14px 8px}.receipt-sauce{display:block;font-size:.78em;color:#555;margin-top:2px;font-weight:400}.item-comment{display:block;font-size:12px;color:#ffd966;margin-top:5px;white-space:pre-wrap}.receipt-comment{display:block;font-size:.78em;color:#555;margin-top:2px;font-weight:400;white-space:pre-wrap}
+.hidden{display:none!important}.sauce-modal{display:none;position:fixed;inset:0;background:#000b;z-index:9999;align-items:center;justify-content:center;padding:18px}.sauce-modal.open{display:flex}.sauce-box{width:min(100%,420px);background:#202020;border:1px solid #ffcf00;border-radius:14px;padding:18px;box-shadow:0 10px 35px #0008}.sauce-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:14px}.sauce-options button{padding:14px 8px}.receipt-sauce{display:block;font-size:.78em;color:#555;margin-top:2px;font-weight:400}
 .setting-section{border-top:1px solid #444;margin-top:20px;padding-top:10px}
 .setting-section:first-of-type{border:0}.setting-section .actions button{min-width:120px}
 #receipt{display:none;color:#000;background:#fff}
+#receipt h2{text-align:center}
 #receiptTools{display:none;background:var(--panel);border:1px solid #594c13;border-radius:12px;padding:14px;margin-top:14px}
 #receiptTools .actions button{min-width:130px}.pill{display:inline-block;border:1px solid #666;padding:4px 8px;border-radius:12px;font-size:12px}
 .notice{border:1px solid #8a6c00;border-radius:8px;padding:10px;color:#ffe390}
@@ -132,7 +133,7 @@ label{display:block;margin:12px 0 5px}input[type=color]{width:80px;height:42px;p
  <div class="sauce-box">
   <h2 id="sauceTitle">اختار الصوص</h2>
   <p id="sauceProductName" class="muted"></p>
-  <div class="sauce-options" id="sauceOptions">
+  <div class="sauce-options">
    <button onclick="chooseSauce('ألجيريان')">ألجيريان</button>
    <button onclick="chooseSauce('بيغي')">بيغي</button>
    <button onclick="chooseSauce('كيتشاب')">كيتشاب</button>
@@ -140,9 +141,6 @@ label{display:block;margin:12px 0 5px}input[type=color]{width:80px;height:42px;p
    <button onclick="chooseSauce('باربيكيو')">باربيكيو</button>
    <button onclick="chooseSauce('حار')">حار</button>
   </div>
-  <button class="outline" style="width:100%;margin-top:9px" onclick="chooseSauce('')">بدون صوص / إضافة المنتوج</button>
-  <label for="itemComment">📝 Commentaire / ملاحظة على المنتوج</label>
-  <textarea id="itemComment" rows="3" placeholder="مثلاً: بلا بصل، بلا خس، زيادة الدجاج..."></textarea>
   <div class="actions"><button class="outline" onclick="closeSaucePicker()">إلغاء</button></div>
  </div>
 </div>
@@ -186,35 +184,17 @@ function dayKey(d=new Date()){return [d.getFullYear(),String(d.getMonth()+1).pad
 function orderNumber(){return Math.max(Number(storage.get('qc_next_order',1))||1,orders.reduce((m,o)=>Math.max(m,Number(o.id)||0),0)+1)}
 function total(){return cart.reduce((s,line)=>s+(Number(products[line.productIndex]?.[1])||0)*line.qty,0)}
 function needsSauce(p){const c=String(p?.[2]||'').toLowerCase();return /سندويش|ساندويش|برغر|برجر|burger|tacos|طاكوس|تاكوس|أطباق|اطباق|plats/.test(c)}
-function openSaucePicker(i){
- pendingSauceProduct=i;
- $('sauceProductName').textContent=products[i]?.[0]||'';
- const needs=needsSauce(products[i]);
- $('sauceTitle').textContent=needs?'اختار الصوص':'ملاحظة على المنتوج';
- $('sauceOptions').style.display=needs?'grid':'none';
- $('itemComment').value='';
- $('sauceModal').classList.add('open');
-}
+function openSaucePicker(i){pendingSauceProduct=i;$('sauceProductName').textContent=products[i]?.[0]||'';$('sauceModal').classList.add('open')}
 function closeSaucePicker(){$('sauceModal').classList.remove('open');pendingSauceProduct=null}
-function chooseSauce(sauce){
- if(pendingSauceProduct===null)return;
- const comment=$('itemComment').value.trim();
- addProductToCart(pendingSauceProduct,sauce,comment);
- closeSaucePicker();
-}
-function addProductToCart(i,sauce='',comment=''){
- let line=cart.find(x=>x.productIndex===i&&(x.sauce||'')===sauce&&(x.comment||'')===comment);
- if(line)line.qty++;
- else cart.push({productIndex:i,sauce,comment,qty:1});
- render();
-}
+function chooseSauce(sauce){if(pendingSauceProduct===null)return;addProductToCart(pendingSauceProduct,sauce);closeSaucePicker()}
+function addProductToCart(i,sauce=''){let line=cart.find(x=>x.productIndex===i&&x.sauce===sauce);if(line)line.qty++;else cart.push({productIndex:i,sauce,qty:1});render()}
 function changeCartLine(lineIndex,delta){if(!cart[lineIndex])return;cart[lineIndex].qty+=delta;if(cart[lineIndex].qty<=0)cart.splice(lineIndex,1);render()}
 function render(){
  let cats=[...new Set(products.map(p=>p[2]))];if(!cats.includes(category))category=cats[0]||'';
  $('tabs').innerHTML=cats.map((c,i)=>`<button class="${category===c?'active':''}" onclick="setCategory(${i})">${escapeHtml(c)}</button>`).join('');
- $('products').innerHTML=products.map((p,i)=>p[2]===category?`<button class="product ${cart.some(x=>x.productIndex===i)?'selected':''}" onclick="openSaucePicker(${i})"><strong>${escapeHtml(p[0])}</strong><div class="price">${Number(p[1])} DH +</div></button>`:'').join('');
+ $('products').innerHTML=products.map((p,i)=>p[2]===category?`<button class="product ${cart.some(x=>x.productIndex===i)?'selected':''}" onclick="${needsSauce(p)?`openSaucePicker(${i})`:`addProductToCart(${i})`}"><strong>${escapeHtml(p[0])}</strong><div class="price">${Number(p[1])} DH +</div></button>`:'').join('');
  $('number').textContent='#'+orderNumber();
- $('lines').innerHTML=cart.length?cart.map((line,j)=>{const p=products[line.productIndex];if(!p)return '';return `<div class="line selected"><span>${escapeHtml(p[0])}${line.sauce?`<small class="receipt-sauce">الصوص: ${escapeHtml(line.sauce)}</small>`:''}${line.comment?`<small class="item-comment">📝 ${escapeHtml(line.comment)}</small>`:''} × ${line.qty}</span><span>${(Number(p[1])*line.qty).toFixed(2)} DH <button onclick="changeCartLine(${j},-1)">−</button><button onclick="changeCartLine(${j},1)">+</button></span></div>`}).join(''):'اختار المنتجات من الفوق';
+ $('lines').innerHTML=cart.length?cart.map((line,j)=>{const p=products[line.productIndex];if(!p)return '';return `<div class="line selected"><span>${escapeHtml(p[0])}${line.sauce?`<small class="receipt-sauce">الصوص: ${escapeHtml(line.sauce)}</small>`:''} × ${line.qty}</span><span>${(Number(p[1])*line.qty).toFixed(2)} DH <button onclick="changeCartLine(${j},-1)">−</button><button onclick="changeCartLine(${j},1)">+</button></span></div>`}).join(''):'اختار المنتجات من الفوق';
  $('total').textContent=total().toFixed(2)+' DH';
  let today=orders.filter(o=>o.day===dayKey());
  $('stats').textContent=`${today.length} طلبات — ${today.reduce((s,o)=>s+Number(o.total||0),0).toFixed(2)} DH`;
@@ -226,12 +206,12 @@ function clearCart(){cart=[];render()}
 function createOrder(){
  if(!cart.length){alert('الطلب فارغ');return null}
  let now=new Date(),id=orderNumber();
- let o={id,day:dayKey(now),time:now.toLocaleString('fr-MA'),items:cart.filter(line=>products[line.productIndex]).map(line=>({name:products[line.productIndex][0],qty:line.qty,price:Number(products[line.productIndex][1]),sauce:line.sauce||'',comment:line.comment||''})),total:total()};
+ let o={id,day:dayKey(now),time:now.toLocaleString('fr-MA'),items:cart.filter(line=>products[line.productIndex]).map(line=>({name:products[line.productIndex][0],qty:line.qty,price:Number(products[line.productIndex][1]),sauce:line.sauce||''})),total:total()};
  orders.push(o);if(!persist()){orders.pop();return null}
  storage.set('qc_next_order',id+1);clearCart();return o;
 }
 function receipt(o){
- $('receipt').innerHTML=`${settings.logo?`<p><img src="${settings.logo}" alt="شعار"></p>`:''}<h2>${escapeHtml(settings.shopName)}</h2><p>${escapeHtml(settings.shopAddress)}</p>${settings.shopPhone?`<p>${escapeHtml(settings.shopPhone)}</p>`:''}<div>طلب رقم: ${escapeHtml(o.id)}</div><div>${escapeHtml(o.time)}</div><hr>${o.items.map(x=>`<div class="line"><span>${escapeHtml(x.name)}${x.sauce?`<small class="receipt-sauce">الصوص: ${escapeHtml(x.sauce)}</small>`:''}${x.comment?`<small class="receipt-comment">ملاحظة: ${escapeHtml(x.comment)}</small>`:''} × ${Number(x.qty)}</span><span>${(Number(x.qty)*Number(x.price)).toFixed(2)} DH</span></div>`).join('')}<hr><div class="line total">المجموع: ${Number(o.total).toFixed(2)} DH</div><p>${escapeHtml(settings.thankYou)}</p>`; applyReceiptDesign();
+ $('receipt').innerHTML=`${settings.logo?`<p><img src="${settings.logo}" alt="شعار"></p>`:''}<h2>${escapeHtml(settings.shopName)}</h2><p>${escapeHtml(settings.shopAddress)}</p>${settings.shopPhone?`<p>${escapeHtml(settings.shopPhone)}</p>`:''}<div>طلب رقم: ${escapeHtml(o.id)}</div><div>${escapeHtml(o.time)}</div><hr>${o.items.map(x=>`<div class="line"><span>${escapeHtml(x.name)}${x.sauce?`<small class="receipt-sauce">الصوص: ${escapeHtml(x.sauce)}</small>`:''} × ${Number(x.qty)}</span><span>${(Number(x.qty)*Number(x.price)).toFixed(2)} DH</span></div>`).join('')}<hr><div class="line total">المجموع: ${Number(o.total).toFixed(2)} DH</div><p>${escapeHtml(settings.thankYou)}</p>`; applyReceiptDesign();
 }
 
 /* إنشاء PDF حقيقي A7 مباشرة وفتحه في الهاتف */
@@ -415,7 +395,7 @@ function renderReports(){
 }
 function download(name,content,type){let blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000)}
 function exportCSV(){
- let rows=[['رقم الطلب','التاريخ','الوقت','المنتجات','المجموع DH'],...orders.map(o=>[o.id,o.day,o.time,(o.items||[]).map(i=>`${i.name}${i.sauce?' - صوص: '+i.sauce:''}${i.comment?' - ملاحظة: '+i.comment:''} x${i.qty}`).join(' | '),o.total])];
+ let rows=[['رقم الطلب','التاريخ','الوقت','المنتجات','المجموع DH'],...orders.map(o=>[o.id,o.day,o.time,(o.items||[]).map(i=>`${i.name} x${i.qty}`).join(' | '),o.total])];
  let csv='\uFEFF'+rows.map(row=>row.map(v=>'"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
  download('queen-crispy-orders-'+dayKey()+'.csv',csv,'text/csv;charset=utf-8');
 }
